@@ -133,32 +133,32 @@ export function UserMenu() {
                 <button
                   onClick={() => {
                     setIsOpen(false);
-                    // Navigate to wallet
+                    navigate('/wallet');
                   }}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-primary/10 transition-colors text-left"
                 >
                   <Wallet className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm">Nubiwallet</span>
+                  <span className="text-sm">Wallet TAU</span>
                 </button>
                 <button
                   onClick={() => {
                     setIsOpen(false);
-                    // Navigate to security
+                    navigate('/dashboard');
                   }}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-primary/10 transition-colors text-left"
                 >
                   <Shield className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm">Seguridad</span>
+                  <span className="text-sm">Dashboard</span>
                 </button>
                 <button
                   onClick={() => {
                     setIsOpen(false);
-                    // Navigate to settings
+                    navigate('/world');
                   }}
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg hover:bg-primary/10 transition-colors text-left"
                 >
                   <Settings className="w-4 h-4 text-muted-foreground" />
-                  <span className="text-sm">Configuración</span>
+                  <span className="text-sm">Ciudad TAMV</span>
                 </button>
               </div>
 
