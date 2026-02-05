@@ -503,6 +503,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_mission_reward: {
+        Args: { p_mission_id: string; p_user_id: string }
+        Returns: boolean
+      }
+      create_transaction: {
+        Args: {
+          p_amount: number
+          p_description?: string
+          p_from_user_id: string
+          p_to_user_id: string
+          p_transaction_type: string
+        }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]

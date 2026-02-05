@@ -1,18 +1,24 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, Globe, ShoppingBag, Gamepad2, Sparkles } from 'lucide-react';
+import { Menu, X, Globe, ShoppingBag, Gamepad2, Sparkles, LayoutDashboard, Wallet, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { useAuth } from '@/hooks/useAuth';
 import { UserMenu } from './UserMenu';
 
 const navItems = [
-  { label: 'Mundo XR', icon: Globe, href: '#mundo' },
-  { label: 'Isabella AI', icon: Sparkles, href: '#isabella' },
-  { label: 'Marketplace', icon: ShoppingBag, href: '#marketplace' },
-  { label: 'Misiones', icon: Gamepad2, href: '#misiones' },
+  { label: 'Mundo XR', icon: Globe, href: '/world' },
+  { label: 'Dashboard', icon: LayoutDashboard, href: '/dashboard' },
+  { label: 'Isabella AI', icon: Sparkles, href: '/chat' },
+  { label: 'Marketplace', icon: ShoppingBag, href: '/marketplace' },
+  { label: 'Wallet', icon: Wallet, href: '/wallet' },
 ];
 
 export function Navigation() {
   const [isOpen, setIsOpen] = useState(false);
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 glass-strong">
@@ -20,9 +26,10 @@ export function Navigation() {
         <div className="flex items-center justify-between h-20">
           {/* Logo */}
           <motion.a 
-            href="#"
+            href="/"
             className="flex items-center gap-3"
             whileHover={{ scale: 1.02 }}
+            onClick={(e) => { e.preventDefault(); navigate('/'); }}
           >
             <div className="relative w-10 h-10 rounded-xl bg-aurora flex items-center justify-center glow-primary">
               <span className="font-display font-bold text-primary-foreground text-lg">T</span>
@@ -36,21 +43,35 @@ export function Navigation() {
           {/* Desktop Navigation */}
           <div className="hidden lg:flex items-center gap-1">
             {navItems.map((item) => (
-              <motion.a
+              <motion.button
                 key={item.label}
-                href={item.href}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-all duration-300"
+                onClick={() => navigate(item.href)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg transition-all duration-300 ${
+                  location.pathname === item.href 
+                    ? 'text-primary bg-primary/10' 
+                    : 'text-muted-foreground hover:text-foreground hover:bg-primary/10'
+                }`}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >
                 <item.icon className="w-4 h-4" />
                 <span className="text-sm font-medium">{item.label}</span>
-              </motion.a>
+              </motion.button>
             ))}
           </div>
 
           {/* CTA Buttons */}
           <div className="hidden md:flex items-center gap-3">
+            {user && (
+              <Button 
+                variant="ghost" 
+                size="icon"
+                onClick={() => navigate('/profile')}
+                className={location.pathname === '/profile' ? 'text-primary' : ''}
+              >
+                <User className="w-5 h-5" />
+              </Button>
+            )}
             <UserMenu />
           </div>
 
@@ -75,18 +96,21 @@ export function Navigation() {
           >
             <div className="container mx-auto px-4 py-4 space-y-2">
               {navItems.map((item, index) => (
-                <motion.a
+                <motion.button
                   key={item.label}
-                  href={item.href}
+                  onClick={() => { navigate(item.href); setIsOpen(false); }}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className="flex items-center gap-3 px-4 py-3 rounded-lg text-muted-foreground hover:text-foreground hover:bg-primary/10 transition-all"
-                  onClick={() => setIsOpen(false)}
+                  className={`flex items-center gap-3 px-4 py-3 rounded-lg w-full transition-all ${
+                    location.pathname === item.href
+                      ? 'text-primary bg-primary/10'
+                      : 'text-muted-foreground hover:text-foreground hover:bg-primary/10'
+                  }`}
                 >
                   <item.icon className="w-5 h-5" />
                   <span className="font-medium">{item.label}</span>
-                </motion.a>
+                </motion.button>
               ))}
               <div className="pt-4 border-t border-primary/10 space-y-2">
                 <UserMenu />
