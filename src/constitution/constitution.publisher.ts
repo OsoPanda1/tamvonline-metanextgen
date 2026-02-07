@@ -1,41 +1,55 @@
-import { TAMVConstitution } from "./constitution.types";
+// src/constitution/constitution.publisher.ts
+
+import { Constitution } from "./constitution.types";
 import { BookPI } from "@/core/bookpi";
 
+type PublishKind = "initial" | "update" | "rollback";
+
+/**
+ * ConstitutionPublisher
+ * - Registra en BookPI cada publicación/actualización de la Constitución TAMV.
+ * - Deja claro quién la promueve, desde qué versión y con qué motivo.
+ * - Marca eventos candidatos a MSR/ledger para tener trilogía:
+ *   código → constitución → auditoría inmutable.
+ */
 export class ConstitutionPublisher {
-  constructor(private bookpi: BookPI) {}
+  constructor(private readonly bookpi: BookPI) {}
 
-  async publish(constitution: TAMVConstitution) {
-    // 1️⃣ Anchor ético (BookPI)
-    const anchor = this.bookpi.anchorEvent({
-      domain: "constitution",
-      type: "constitution_created",
-      level: "critical",
-      data: {
-        id: constitution.id,
-        version: constitution.version,
-        hash: constitution.hash,
-        principles: constitution.principles,
-      },
-      candidateForLedger: true,
-    });
+  async publish(options: {
+    constitution: Constitution;
+    kind: PublishKind;
+    actorId: string;        // operador humano / EOCT / sistema
+    reason: string;         // narrativa breve: por qué cambia
+    previousVersion?: string;
+  }) {
+    const {
+      constitution,
+      kind,
+      actorId,
+      reason,
+      previousVersion,
+    } = options;
 
-    // 2️⃣ Registro MSR (blockchain)
-    // (simulado aquí, pero el hash es real)
-    const msrPayload = {
+    // No incluimos el texto completo en raw si es gigante; se guarda hash y metadatos
+    const payload = {
       constitutionId: constitution.id,
       version: constitution.version,
       hash: constitution.hash,
-      bookpiAnchorId: anchor.id,
-      ts: Date.now(),
+      signer: constitution.signer,
+      createdAt: constitution.createdAt,
+      kind,
+      actorId,
+      reason,
+      previousVersion: previousVersion ?? null,
+      articleCount: constitution.articles.length,
     };
 
-    //  aquí entra el módulo MSR real
-    // msr.register(msrPayload)
-
-    return {
-      anchored: true,
-      ledgerCandidate: true,
-      msrPayload,
-    };
+    await this.bookpi.anchorEvent({
+      domain: "constitution",
+      type: "constitution_published",
+      level: kind === "rollback" ? "critical" : "high",
+      data: payload,
+      candidateForLedger: true,
+    });
   }
 }
