@@ -49,7 +49,7 @@ export default function ApiConsole() {
     setResult(null);
 
     const ctx: RuntimeContext = {
-      userId: user?.id,
+      userId: user?.id || 'test_user',
       sessionToken: user ? 'active' : undefined,
       timestamp: new Date().toISOString(),
       traceId: crypto.randomUUID().slice(0, 8),

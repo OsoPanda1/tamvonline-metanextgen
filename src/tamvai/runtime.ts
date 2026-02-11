@@ -9,6 +9,7 @@ import { scanEconomy, scanThreats } from '@/lib/tamv/radars';
 import { receiveSignal, getEOCTState } from '@/lib/tamv/eoct';
 import { anchorEvent } from '@/lib/tamv/bookpi';
 import type { TamvaiOperation, SecurityTag, MonitoringTag, EmergencyPlan } from './spec';
+import { handlers } from './handlers';
 
 // ── Runtime Context ──
 export interface RuntimeContext {
@@ -297,6 +298,8 @@ export async function executeOperation(
   try {
     if (handler) {
       data = await handler(input);
+    } else if (handlers[op.id]) {
+      data = await handlers[op.id](input);
     } else {
       data = { message: `${op.id} executed (no handler bound)` };
     }
