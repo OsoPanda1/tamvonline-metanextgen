@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Menu, X, Globe, ShoppingBag, Gamepad2, Sparkles, LayoutDashboard, Wallet, User } from 'lucide-react';
+import { Menu, X, Globe, ShoppingBag, Sparkles, LayoutDashboard, Wallet, User, Activity, Code2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/hooks/useAuth';
@@ -12,6 +12,8 @@ const navItems = [
   { label: 'Isabella AI', icon: Sparkles, href: '/chat' },
   { label: 'Marketplace', icon: ShoppingBag, href: '/marketplace' },
   { label: 'Wallet', icon: Wallet, href: '/wallet' },
+  { label: 'Sistema', icon: Activity, href: '/system' },
+  { label: 'API', icon: Code2, href: '/api' },
 ];
 
 export function Navigation() {

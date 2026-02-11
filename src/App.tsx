@@ -13,6 +13,8 @@ import Marketplace from "./pages/Marketplace";
 import Profile from "./pages/Profile";
 import ChatPage from "./pages/ChatPage";
 import NotFound from "./pages/NotFound";
+import SystemStatus from "./pages/SystemStatus";
+import ApiConsole from "./pages/ApiConsole";
 
 const queryClient = new QueryClient();
 
@@ -32,6 +34,8 @@ const App = () => (
             <Route path="/marketplace" element={<Marketplace />} />
             <Route path="/profile" element={<Profile />} />
             <Route path="/chat" element={<ChatPage />} />
+            <Route path="/system" element={<SystemStatus />} />
+            <Route path="/api" element={<ApiConsole />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
