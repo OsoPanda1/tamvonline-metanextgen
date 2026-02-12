@@ -32,7 +32,9 @@ export type TamvaiDomain =
   | 'Protocols'
   | 'Governance'
   | 'Security'
-  | 'System';
+  | 'System'
+  | 'Gamification'
+  | 'University';
 
 // ── Operation Definition ──
 export interface TamvaiOperation {
