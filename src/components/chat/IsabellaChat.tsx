@@ -454,7 +454,7 @@ export function IsabellaChat({ onClose, embedded = false }: IsabellaChatProps) {
                   </motion.div>
                 ))}
               </div>
-            </ScrollArea>
+            </div>
 
             {/* Input */}
             <form onSubmit={handleSubmit} className="p-4 border-t border-primary/10">
