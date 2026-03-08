@@ -45,7 +45,8 @@ const MODEL =
   Deno.env.get("TAMV_ISABELLA_MODEL") ??
   "google/gemini-3-flash-preview";
 
-const kv = await Deno.openKv(); // BookPI real (ledger ético)
+// BookPI ledger — in-memory fallback (Deno.openKv not available in Supabase edge)
+const bookpiLog: Array<Record<string, unknown>> = [];
 
 const MAX_MESSAGES = 50;
 const MAX_CHARS = 8_000;
