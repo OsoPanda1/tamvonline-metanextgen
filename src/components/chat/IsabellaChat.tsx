@@ -2,7 +2,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   Bot, Send, X, Minimize2, Maximize2, 
-  Loader2
+  Loader2, ImageIcon, Download
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -15,9 +15,46 @@ interface Message {
   role: 'user' | 'assistant';
   content: string;
   timestamp: Date;
+  image?: string; // base64 data URL or public URL
+  imageLoading?: boolean;
 }
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/isabella-chat`;
+const IMAGE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/isabella-image`;
+
+// Detect if user is asking for image generation
+const IMAGE_KEYWORDS = [
+  'genera una imagen', 'genera imagen', 'crea una imagen', 'crea imagen',
+  'dibuja', 'diseña', 'ilustra', 'pinta', 'renderiza',
+  'generate an image', 'create an image', 'draw', 'render',
+  'haz una imagen', 'hazme una imagen', 'muéstrame', 'visualiza',
+  'genera un logo', 'crea un logo', 'diseña un logo',
+  'genera un arte', 'crea un arte', 'genera artwork',
+  'genera una foto', 'crea una foto',
+  'genera un retrato', 'crea un retrato',
+  'genera un paisaje', 'genera una escena',
+  'imagina y genera', 'imagina y crea',
+];
+
+function isImageRequest(text: string): boolean {
+  const lower = text.toLowerCase().trim();
+  return IMAGE_KEYWORDS.some(kw => lower.includes(kw));
+}
+
+function extractImagePrompt(text: string): string {
+  const lower = text.toLowerCase();
+  // Remove the command prefix and return the description
+  for (const kw of IMAGE_KEYWORDS) {
+    const idx = lower.indexOf(kw);
+    if (idx !== -1) {
+      let prompt = text.slice(idx + kw.length).trim();
+      // Remove leading "de", "of", ":" etc.
+      prompt = prompt.replace(/^(de|of|del|sobre|con|:|\s)+/i, '').trim();
+      return prompt || text;
+    }
+  }
+  return text;
+}
 
 interface IsabellaChatProps {
   onClose?: () => void;
@@ -31,7 +68,7 @@ export function IsabellaChat({ onClose, embedded = false }: IsabellaChatProps) {
     {
       id: 'welcome',
       role: 'assistant',
-      content: '¡Hola, Ciudadano! Soy Isabella, tu compañera en el universo TAMV. Estoy aquí para guiarte, protegerte y acompañarte en tu viaje por esta civilización digital. ¿En qué puedo ayudarte hoy?',
+      content: '¡Hola, Ciudadano! Soy Isabella, tu compañera en el universo TAMV. Puedo conversar contigo, responder preguntas y también **generar imágenes**. Solo dime "genera una imagen de..." y crearé algo visual para ti. ¿En qué puedo ayudarte?',
       timestamp: new Date(),
     }
   ]);
@@ -42,24 +79,115 @@ export function IsabellaChat({ onClose, embedded = false }: IsabellaChatProps) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
-  // Scroll to bottom when messages change
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
   }, [messages]);
 
-  // Focus input when chat opens
   useEffect(() => {
     if ((isOpen || embedded) && !isMinimized && inputRef.current) {
       inputRef.current.focus();
     }
   }, [isOpen, isMinimized, embedded]);
 
+  // Image generation handler
+  const generateImage = useCallback(async (userMessage: string) => {
+    setIsLoading(true);
+    const prompt = extractImagePrompt(userMessage);
+
+    const userMsg: Message = {
+      id: `user-${Date.now()}`,
+      role: 'user',
+      content: userMessage,
+      timestamp: new Date(),
+    };
+
+    const assistantId = `assistant-img-${Date.now()}`;
+    const loadingMsg: Message = {
+      id: assistantId,
+      role: 'assistant',
+      content: '🎨 Generando imagen...',
+      timestamp: new Date(),
+      imageLoading: true,
+    };
+
+    setMessages(prev => [...prev, userMsg, loadingMsg]);
+
+    try {
+      const response = await fetch(IMAGE_URL, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+        },
+        body: JSON.stringify({
+          prompt,
+          userId: user?.id,
+        }),
+      });
+
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({}));
+        if (response.status === 429) {
+          toast.error('Demasiadas solicitudes. Intenta en un momento.');
+        } else if (response.status === 402) {
+          toast.error('Créditos de IA agotados.');
+        }
+        throw new Error(err.error || 'Error generando imagen');
+      }
+
+      const data = await response.json();
+
+      if (data.success && data.imageData) {
+        const imageUrl = data.publicUrl || data.imageData;
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: data.textResponse || `✨ Aquí tienes tu imagen: "${prompt}"`,
+                  image: imageUrl,
+                  imageLoading: false,
+                }
+              : m
+          )
+        );
+      } else {
+        setMessages(prev =>
+          prev.map(m =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  content: data.error || 'No pude generar la imagen. Intenta con otra descripción.',
+                  imageLoading: false,
+                }
+              : m
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Image generation error:', error);
+      setMessages(prev =>
+        prev.map(m =>
+          m.id === assistantId
+            ? {
+                ...m,
+                content: '❌ Error al generar la imagen. Intenta de nuevo.',
+                imageLoading: false,
+              }
+            : m
+        )
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  // Text chat handler (streaming)
   const streamChat = useCallback(async (userMessage: string) => {
     setIsLoading(true);
     
-    // Add user message
     const userMsg: Message = {
       id: `user-${Date.now()}`,
       role: 'user',
@@ -69,7 +197,6 @@ export function IsabellaChat({ onClose, embedded = false }: IsabellaChatProps) {
     
     setMessages(prev => [...prev, userMsg]);
     
-    // Prepare messages for API
     const apiMessages = messages
       .filter(m => m.id !== 'welcome')
       .map(m => ({ role: m.role, content: m.content }));
@@ -93,7 +220,6 @@ export function IsabellaChat({ onClose, embedded = false }: IsabellaChatProps) {
 
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({}));
-        
         if (response.status === 429) {
           toast.error('Isabella está ocupada. Intenta en un momento.');
           throw new Error('Rate limited');
@@ -102,18 +228,15 @@ export function IsabellaChat({ onClose, embedded = false }: IsabellaChatProps) {
           toast.error('Créditos de IA agotados.');
           throw new Error('Payment required');
         }
-        
         throw new Error(errorData.error || 'Error de conexión');
       }
 
       const reader = response.body?.getReader();
       const decoder = new TextDecoder();
-      
       if (!reader) throw new Error('No reader available');
 
       let buffer = '';
 
-      // Add empty assistant message
       setMessages(prev => [...prev, {
         id: assistantId,
         role: 'assistant',
@@ -126,39 +249,29 @@ export function IsabellaChat({ onClose, embedded = false }: IsabellaChatProps) {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-
-        // Process SSE lines
         const lines = buffer.split('\n');
         buffer = lines.pop() || '';
 
         for (const line of lines) {
           if (line.startsWith(':') || !line.trim()) continue;
           if (!line.startsWith('data: ')) continue;
-
           const jsonStr = line.slice(6).trim();
           if (jsonStr === '[DONE]') continue;
-
           try {
             const parsed = JSON.parse(jsonStr);
             const content = parsed.choices?.[0]?.delta?.content;
-            
             if (content) {
               assistantContent += content;
-              setMessages(prev => 
-                prev.map(m => 
-                  m.id === assistantId 
-                    ? { ...m, content: assistantContent }
-                    : m
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === assistantId ? { ...m, content: assistantContent } : m
                 )
               );
             }
-          } catch {
-            // Incomplete JSON, will be completed in next chunk
-          }
+          } catch {}
         }
       }
 
-      // Process any remaining buffer
       if (buffer.trim() && buffer.startsWith('data: ')) {
         const jsonStr = buffer.slice(6).trim();
         if (jsonStr !== '[DONE]') {
@@ -167,26 +280,20 @@ export function IsabellaChat({ onClose, embedded = false }: IsabellaChatProps) {
             const content = parsed.choices?.[0]?.delta?.content;
             if (content) {
               assistantContent += content;
-              setMessages(prev => 
-                prev.map(m => 
-                  m.id === assistantId 
-                    ? { ...m, content: assistantContent }
-                    : m
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === assistantId ? { ...m, content: assistantContent } : m
                 )
               );
             }
           } catch {}
         }
       }
-
     } catch (error) {
       console.error('Chat error:', error);
-      
-      // Remove empty assistant message if error occurred before streaming
       if (!assistantContent) {
         setMessages(prev => prev.filter(m => m.id !== assistantId));
       }
-      
       if (error instanceof Error && !['Rate limited', 'Payment required'].includes(error.message)) {
         toast.error('Error conectando con Isabella');
       }
@@ -201,7 +308,12 @@ export function IsabellaChat({ onClose, embedded = false }: IsabellaChatProps) {
     
     const message = input.trim();
     setInput('');
-    streamChat(message);
+
+    if (isImageRequest(message)) {
+      generateImage(message);
+    } else {
+      streamChat(message);
+    }
   };
 
   const handleClose = () => {
@@ -209,7 +321,14 @@ export function IsabellaChat({ onClose, embedded = false }: IsabellaChatProps) {
     onClose?.();
   };
 
-  // Floating button mode (not embedded)
+  const downloadImage = (imageUrl: string) => {
+    const link = document.createElement('a');
+    link.href = imageUrl;
+    link.download = `isabella-${Date.now()}.png`;
+    link.click();
+  };
+
+  // Floating button mode
   if (!embedded && !isOpen) {
     return (
       <motion.button
@@ -226,13 +345,12 @@ export function IsabellaChat({ onClose, embedded = false }: IsabellaChatProps) {
     );
   }
 
-  // Chat panel
   const chatContent = (
     <motion.div
       initial={{ opacity: 0, y: 100, scale: 0.9 }}
-      animate={{ 
-        opacity: 1, 
-        y: 0, 
+      animate={{
+        opacity: 1,
+        y: 0,
         scale: 1,
         height: isMinimized ? 'auto' : embedded ? '100%' : '500px',
       }}
@@ -252,24 +370,14 @@ export function IsabellaChat({ onClose, embedded = false }: IsabellaChatProps) {
           </div>
           <div>
             <h3 className="font-display font-semibold text-sm">Isabella AI</h3>
-            <p className="text-xs text-muted-foreground">Guardiana TAMV</p>
+            <p className="text-xs text-muted-foreground">Guardiana TAMV · 🎨 Imagen</p>
           </div>
         </div>
         <div className="flex items-center gap-1">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={() => setIsMinimized(!isMinimized)}
-          >
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setIsMinimized(!isMinimized)}>
             {isMinimized ? <Maximize2 className="w-4 h-4" /> : <Minimize2 className="w-4 h-4" />}
           </Button>
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-8 w-8"
-            onClick={handleClose}
-          >
+          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={handleClose}>
             <X className="w-4 h-4" />
           </Button>
         </div>
@@ -301,7 +409,42 @@ export function IsabellaChat({ onClose, embedded = false }: IsabellaChatProps) {
                       }`}
                     >
                       <p className="text-sm whitespace-pre-wrap">{message.content}</p>
-                      {message.role === 'assistant' && !message.content && isLoading && (
+
+                      {/* Image loading state */}
+                      {message.imageLoading && (
+                        <div className="flex items-center gap-2 mt-2 py-2">
+                          <Loader2 className="w-5 h-5 animate-spin text-primary" />
+                          <span className="text-xs text-muted-foreground">Creando tu imagen...</span>
+                        </div>
+                      )}
+
+                      {/* Generated image */}
+                      {message.image && (
+                        <div className="mt-3 space-y-2">
+                          <div className="relative group rounded-xl overflow-hidden border border-primary/20">
+                            <img
+                              src={message.image}
+                              alt="Imagen generada por Isabella"
+                              className="w-full h-auto rounded-xl max-h-[300px] object-cover"
+                              loading="lazy"
+                            />
+                            <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="secondary"
+                                className="h-8 text-xs"
+                                onClick={() => downloadImage(message.image!)}
+                              >
+                                <Download className="w-3 h-3 mr-1" />
+                                Descargar
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Loading state for text */}
+                      {message.role === 'assistant' && !message.content && !message.imageLoading && isLoading && (
                         <div className="flex items-center gap-2">
                           <Loader2 className="w-4 h-4 animate-spin" />
                           <span className="text-xs text-muted-foreground">Pensando...</span>
@@ -320,7 +463,7 @@ export function IsabellaChat({ onClose, embedded = false }: IsabellaChatProps) {
                   ref={inputRef}
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder="Escribe un mensaje..."
+                  placeholder='Escribe o di "genera una imagen de..."'
                   disabled={isLoading}
                   className="flex-1 bg-input border-primary/20 focus:border-primary"
                 />
@@ -332,11 +475,18 @@ export function IsabellaChat({ onClose, embedded = false }: IsabellaChatProps) {
                 >
                   {isLoading ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : isImageRequest(input) ? (
+                    <ImageIcon className="w-4 h-4" />
                   ) : (
                     <Send className="w-4 h-4" />
                   )}
                 </Button>
               </div>
+              {input && isImageRequest(input) && (
+                <p className="text-xs text-primary mt-1 flex items-center gap-1">
+                  <ImageIcon className="w-3 h-3" /> Modo imagen activado
+                </p>
+              )}
             </form>
           </motion.div>
         )}
