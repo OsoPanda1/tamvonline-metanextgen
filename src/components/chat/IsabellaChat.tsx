@@ -392,7 +392,7 @@ export function IsabellaChat({ onClose, embedded = false }: IsabellaChatProps) {
             exit={{ height: 0 }}
             className="flex-1 flex flex-col overflow-hidden"
           >
-            <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+            <div className="flex-1 overflow-y-auto p-4" ref={scrollRef}>
               <div className="space-y-4">
                 {messages.map((message) => (
                   <motion.div

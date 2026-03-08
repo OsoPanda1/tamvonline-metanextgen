@@ -108,11 +108,13 @@ function allow(key: string) {
 /* ===================== BOOKPI (LEDGER ÉTICO) ===================== */
 
 async function recordBookPI(event: Json) {
-  const id = crypto.randomUUID();
-  await kv.set(["bookpi", id], {
+  const entry = {
+    id: crypto.randomUUID(),
     ...event,
     ts: new Date().toISOString(),
-  });
+  };
+  bookpiLog.push(entry);
+  console.info("BookPI:", JSON.stringify(entry));
 }
 
 /* ===================== ANÁLISIS EMOCIONAL ===================== */
