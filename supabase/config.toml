@@ -1,1 +1,7 @@
 project_id = "unukaiwdqnjbhejbtgqw"
+
+[functions.isabella-chat]
+verify_jwt = false
+
+[functions.isabella-image]
+verify_jwt = false
