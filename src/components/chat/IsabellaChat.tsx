@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { ScrollArea } from '@/components/ui/scroll-area';
+
 import { useAuth } from '@/hooks/useAuth';
 import { toast } from 'sonner';
 
@@ -392,7 +392,7 @@ export function IsabellaChat({ onClose, embedded = false }: IsabellaChatProps) {
             exit={{ height: 0 }}
             className="flex-1 flex flex-col overflow-hidden"
           >
-            <ScrollArea className="flex-1 p-4" ref={scrollRef}>
+            <div className="flex-1 overflow-y-auto p-4" ref={scrollRef}>
               <div className="space-y-4">
                 {messages.map((message) => (
                   <motion.div
@@ -454,7 +454,7 @@ export function IsabellaChat({ onClose, embedded = false }: IsabellaChatProps) {
                   </motion.div>
                 ))}
               </div>
-            </ScrollArea>
+            </div>
 
             {/* Input */}
             <form onSubmit={handleSubmit} className="p-4 border-t border-primary/10">

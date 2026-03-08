@@ -45,7 +45,8 @@ const MODEL =
   Deno.env.get("TAMV_ISABELLA_MODEL") ??
   "google/gemini-3-flash-preview";
 
-const kv = await Deno.openKv(); // BookPI real (ledger ético)
+// BookPI ledger — in-memory fallback (Deno.openKv not available in Supabase edge)
+const bookpiLog: Array<Record<string, unknown>> = [];
 
 const MAX_MESSAGES = 50;
 const MAX_CHARS = 8_000;
@@ -57,7 +58,7 @@ const WINDOW_MS = 60_000;
 const cors = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
@@ -107,11 +108,13 @@ function allow(key: string) {
 /* ===================== BOOKPI (LEDGER ÉTICO) ===================== */
 
 async function recordBookPI(event: Json) {
-  const id = crypto.randomUUID();
-  await kv.set(["bookpi", id], {
+  const entry = {
+    id: crypto.randomUUID(),
     ...event,
     ts: new Date().toISOString(),
-  });
+  };
+  bookpiLog.push(entry);
+  console.info("BookPI:", JSON.stringify(entry));
 }
 
 /* ===================== ANÁLISIS EMOCIONAL ===================== */
