@@ -191,25 +191,24 @@ async function executeProtocol(
 serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: cors });
   if (req.method !== "POST")
-    return new Response("Método no permitido", { status: 405 });
+    return jsonError("Método no permitido", 405);
+
+  if (!API_KEY) return jsonError("LOVABLE_API_KEY no configurada", 500);
 
   const body = (await req.json().catch(() => null)) as RequestBody | null;
   if (!body || !Array.isArray(body.messages))
-    return new Response("Payload inválido", { status: 400 });
+    return jsonError("Payload inválido", 400);
 
   if (body.messages.length > MAX_MESSAGES)
-    return new Response("Exceso de mensajes", { status: 400 });
+    return jsonError("Exceso de mensajes", 400);
 
-  const chars = body.messages.reduce((a, m) => a + m.content.length, 0);
+  const chars = body.messages.reduce((a, m) => a + (m.content?.length ?? 0), 0);
   if (chars > MAX_CHARS)
-    return new Response("Conversación demasiado extensa", { status: 400 });
+    return jsonError("Conversación demasiado extensa", 400);
 
   const key = body.userId ?? body.sessionId ?? "anon";
   if (!allow(key))
-    return new Response(
-      "Isabella percibe saturación. Pausa y regresa.",
-      { status: 429 },
-    );
+    return jsonError("Isabella percibe saturación. Pausa y regresa.", 429);
 
   const cellId = body.cellId ?? "CENTRAL";
 
@@ -231,7 +230,7 @@ serve(async (req) => {
         role: "assistant",
         content: guardian.message,
       }),
-      { headers: cors },
+      { headers: { ...cors, "Content-Type": "application/json" } },
     );
   }
 
@@ -242,7 +241,9 @@ serve(async (req) => {
       userId: body.userId,
       cellId,
     });
-    return new Response(JSON.stringify({ result }), { headers: cors });
+    return new Response(JSON.stringify({ result }), {
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
   }
 
   /* ---------- IA ---------- */
@@ -258,17 +259,30 @@ serve(async (req) => {
     ],
   };
 
-  const upstream = await fetch(AI_URL, {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${API_KEY}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(payload),
-  });
+  let upstream: Response;
+  try {
+    upstream = await fetch(AI_URL, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload),
+    });
+  } catch (e) {
+    console.error("Upstream fetch failed:", e);
+    return jsonError("Isabella no pudo conectar con su núcleo", 502);
+  }
 
-  if (!upstream.ok)
-    return new Response("Isabella no pudo responder", { status: 502 });
+  if (!upstream.ok) {
+    const errText = await upstream.text().catch(() => "");
+    console.error(`AI gateway error ${upstream.status}: ${errText}`);
+    if (upstream.status === 429)
+      return jsonError("Demasiadas solicitudes. Intenta en un momento.", 429);
+    if (upstream.status === 402)
+      return jsonError("Créditos de IA agotados.", 402);
+    return jsonError("Isabella no pudo responder", 502);
+  }
 
   if (body.audit) {
     await recordBookPI({
@@ -288,3 +302,10 @@ serve(async (req) => {
     },
   });
 });
+
+function jsonError(message: string, status: number): Response {
+  return new Response(JSON.stringify({ error: message }), {
+    status,
+    headers: { ...cors, "Content-Type": "application/json" },
+  });
+}
